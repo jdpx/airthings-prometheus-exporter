@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,6 +14,8 @@ import (
 	"github.com/jdpx/airthings-prometheus-exporter/internal/airthings"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/clientcredentials"
 )
 
 type Config struct {
@@ -22,12 +25,19 @@ type Config struct {
 	PollInterval  time.Duration
 	IncludeSerial string // comma-separated
 	ListenAddr    string
+
+	// OAuth2 client credentials (optional, used if Token is empty)
+	OAuthClientID     string
+	OAuthClientSecret string
+	OAuthTokenURL     string
+	OAuthScope        string
+	OAuthAudience     string
 }
 
 type Exporter struct {
 	cfg      Config
 	client   *airthings.APIClient
-	rt       *authRoundTripper
+	rt       *rateLimitCaptureRoundTripper
 	registry *prometheus.Registry
 
 	// metrics
@@ -54,11 +64,37 @@ func New(cfg Config) (*Exporter, error) {
 		return nil, fmt.Errorf("invalid UNIT: %s", cfg.Unit)
 	}
 
-	transport := &authRoundTripper{
-		underlying: http.DefaultTransport,
-		token:      cfg.Token,
+	var httpClient *http.Client
+	var rlCapture = &rateLimitCaptureRoundTripper{underlying: http.DefaultTransport}
+
+	if strings.TrimSpace(cfg.Token) != "" {
+		// Static bearer token mode
+		httpClient = &http.Client{Transport: &bearerRoundTripper{
+			token:      cfg.Token,
+			underlying: rlCapture,
+		}}
+	} else if cfg.OAuthClientID != "" && cfg.OAuthClientSecret != "" && cfg.OAuthTokenURL != "" {
+		// OAuth2 client credentials mode
+		cc := &clientcredentials.Config{
+			ClientID:     cfg.OAuthClientID,
+			ClientSecret: cfg.OAuthClientSecret,
+			TokenURL:     cfg.OAuthTokenURL,
+		}
+		if cfg.OAuthScope != "" {
+			cc.Scopes = []string{cfg.OAuthScope}
+		}
+		if cfg.OAuthAudience != "" {
+			if cc.EndpointParams == nil {
+				cc.EndpointParams = url.Values{}
+			}
+			cc.EndpointParams.Set("audience", cfg.OAuthAudience)
+		}
+		ts := cc.TokenSource(context.Background())
+		oauthTransport := &oauth2.Transport{Source: ts, Base: rlCapture}
+		httpClient = &http.Client{Transport: oauthTransport, Timeout: 30 * time.Second}
+	} else {
+		return nil, errors.New("no AIRTHINGS_TOKEN provided and OAuth client credentials not configured")
 	}
-	httpClient := &http.Client{Transport: transport, Timeout: 30 * time.Second}
 
 	apiCfg := airthings.NewConfiguration()
 	apiCfg.HTTPClient = httpClient
@@ -68,7 +104,7 @@ func New(cfg Config) (*Exporter, error) {
 	e := &Exporter{
 		cfg:      cfg,
 		client:   client,
-		rt:       transport,
+		rt:       rlCapture,
 		registry: reg,
 		devMap:   map[string]deviceInfo{},
 	}
@@ -132,10 +168,21 @@ func New(cfg Config) (*Exporter, error) {
 	return e, nil
 }
 
-// authRoundTripper injects Bearer token and captures rate limit headers.
-type authRoundTripper struct {
+// bearerRoundTripper injects static Bearer token
+type bearerRoundTripper struct {
 	underlying http.RoundTripper
 	token      string
+}
+
+func (b *bearerRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	req2 := req.Clone(req.Context())
+	req2.Header.Set("Authorization", "Bearer "+b.token)
+	return b.underlying.RoundTrip(req2)
+}
+
+// rateLimitCaptureRoundTripper captures rate limit headers
+type rateLimitCaptureRoundTripper struct {
+	underlying http.RoundTripper
 
 	mu        sync.Mutex
 	limit     float64
@@ -143,17 +190,13 @@ type authRoundTripper struct {
 	retryAt   time.Time
 }
 
-func (a *authRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	req2 := req.Clone(req.Context())
-	req2.Header.Set("Authorization", "Bearer "+a.token)
-	resp, err := a.underlying.RoundTrip(req2)
+func (a *rateLimitCaptureRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := a.underlying.RoundTrip(req)
 	if err != nil {
 		return nil, err
 	}
-
 	// Capture headers
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	if v := resp.Header.Get("X-RateLimit-Limit"); v != "" {
 		if f, err := strconv.ParseFloat(v, 64); err == nil {
 			a.limit = f
@@ -172,6 +215,7 @@ func (a *authRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 			a.retryAt = t
 		}
 	}
+	a.mu.Unlock()
 	return resp, nil
 }
 

@@ -8,6 +8,7 @@ A lightweight Prometheus exporter which periodically fetches sensor data from th
 - Handles API rate limits and backs off using `X-RateLimit-*` headers
 - Exposes rate limit state and error counters as metrics
 - Configurable units, poll interval, device filtering
+- Supports static Bearer token or OAuth2 Client Credentials
 - Multi-arch container images published via GoReleaser
 
 ## How it works
@@ -18,9 +19,26 @@ A lightweight Prometheus exporter which periodically fetches sensor data from th
 
 Client code is generated from the API specification at `openapi.yaml` using `openapi-generator`.
 
+## Authentication
+
+You can authenticate either with a ready-to-use Bearer token or via OAuth2 Client Credentials.
+
+- Static token (simplest):
+  - `AIRTHINGS_TOKEN`: Provided token is sent as `Authorization: Bearer <token>`.
+- OAuth2 Client Credentials (machine-to-machine), per Airthings auth docs ([Authorization docs](https://consumer-api-doc.airthings.com/docs/api/authorization)):
+  - `AIRTHINGS_CLIENT_ID`
+  - `AIRTHINGS_CLIENT_SECRET`
+  - `AIRTHINGS_TOKEN_URL` (issuer token endpoint)
+  - `AIRTHINGS_SCOPE` (optional)
+  - `AIRTHINGS_AUDIENCE` (optional, if your provider requires an audience claim)
+
+If `AIRTHINGS_TOKEN` is unset and client credentials are configured, the exporter fetches and refreshes an access token automatically.
+
 ## Configuration (environment variables)
 
-- `AIRTHINGS_TOKEN` (required): Bearer token for the Airthings Consumer API
+- `AIRTHINGS_TOKEN` (optional if OAuth2 provided): Bearer token for the API
+- `AIRTHINGS_CLIENT_ID` / `AIRTHINGS_CLIENT_SECRET` / `AIRTHINGS_TOKEN_URL` (optional): OAuth2 client credentials
+- `AIRTHINGS_SCOPE` / `AIRTHINGS_AUDIENCE` (optional): Additional OAuth2 parameters
 - `ACCOUNT_ID` (optional): Account ID. If unset, the exporter discovers the single account
 - `UNIT` (optional): `metric` (default) or `imperial`
 - `POLL_INTERVAL` (optional): Poll interval, e.g. `60s` (will dynamically back off when rate-limited)
@@ -44,7 +62,7 @@ Notes:
 
 ## Running locally
 
-With Go installed:
+With Go installed (Bearer token example):
 
 ```bash
 AIRTHINGS_TOKEN=your_token \
@@ -53,6 +71,19 @@ POLL_INTERVAL=60s \
 LISTEN_ADDR=":9000" \
 INCLUDE_SERIALS="" \
 LOG_LEVEL=info \
+go run ./cmd/airthings_exporter
+```
+
+OAuth2 client credentials example:
+
+```bash
+AIRTHINGS_CLIENT_ID=... \
+AIRTHINGS_CLIENT_SECRET=... \
+AIRTHINGS_TOKEN_URL=https://<issuer>/oauth/token \
+AIRTHINGS_SCOPE="..." \
+AIRTHINGS_AUDIENCE="..." \
+UNIT=metric \
+POLL_INTERVAL=60s \
 go run ./cmd/airthings_exporter
 ```
 
@@ -66,12 +97,22 @@ Build locally:
 docker build -t ghcr.io/jdpx/airthings_prometheus_exporter:dev .
 ```
 
-Run:
+Run (Bearer token):
 
 ```bash
 docker run --rm -p 9000:9000 \
   -e AIRTHINGS_TOKEN=your_token \
   -e UNIT=metric \
+  ghcr.io/jdpx/airthings_prometheus_exporter:dev
+```
+
+Run (OAuth2 client credentials):
+
+```bash
+docker run --rm -p 9000:9000 \
+  -e AIRTHINGS_CLIENT_ID=... \
+  -e AIRTHINGS_CLIENT_SECRET=... \
+  -e AIRTHINGS_TOKEN_URL=https://<issuer>/oauth/token \
   ghcr.io/jdpx/airthings_prometheus_exporter:dev
 ```
 
@@ -83,16 +124,7 @@ A sample compose file is included:
 docker compose up -d
 ```
 
-Set the following in your shell or a `.env` file used by Compose:
-
-```bash
-AIRTHINGS_TOKEN=your_token
-UNIT=metric
-POLL_INTERVAL=60s
-INCLUDE_SERIALS=
-LISTEN_ADDR=:9000
-LOG_LEVEL=info
-```
+Set env in your shell or a `.env` file.
 
 ## Prometheus scrape config
 
@@ -100,15 +132,6 @@ LOG_LEVEL=info
 - job_name: airthings
   static_configs:
     - targets: ["airthings-exporter:9000"]
-```
-
-## Code generation
-
-We use `openapi-generator` to generate the API client from `openapi.yaml`:
-
-```bash
-brew install openapi-generator
-openapi-generator generate -i openapi.yaml -g go -o internal/airthings --additional-properties=packageName=airthings
 ```
 
 ## Development
@@ -120,8 +143,7 @@ openapi-generator generate -i openapi.yaml -g go -o internal/airthings --additio
 
 ## Releases & CI
 
-- Multi-arch images are built and published to GHCR via GoReleaser on pushes to `main`.
-- GitHub Actions workflow in `.github/workflows/release.yaml` automatically bumps a patch tag and runs GoReleaser.
+- Images are built and published to GHCR via GoReleaser on pushes to `main`.
 
 ## Security & rate limits
 

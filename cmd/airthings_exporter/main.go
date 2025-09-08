@@ -28,9 +28,16 @@ func main() {
 		PollInterval:  getDurationOr("POLL_INTERVAL", 60*time.Second),
 		IncludeSerial: os.Getenv("INCLUDE_SERIALS"),
 		ListenAddr:    getOr("LISTEN_ADDR", ":9000"),
+
+		OAuthClientID:     os.Getenv("AIRTHINGS_CLIENT_ID"),
+		OAuthClientSecret: os.Getenv("AIRTHINGS_CLIENT_SECRET"),
+		OAuthTokenURL:     os.Getenv("AIRTHINGS_TOKEN_URL"),
+		OAuthScope:        os.Getenv("AIRTHINGS_SCOPE"),
+		OAuthAudience:     os.Getenv("AIRTHINGS_AUDIENCE"),
 	}
-	if cfg.Token == "" {
-		log.Fatal("AIRTHINGS_TOKEN is required")
+
+	if cfg.Token == "" && (cfg.OAuthClientID == "" || cfg.OAuthClientSecret == "" || cfg.OAuthTokenURL == "") {
+		log.Fatal("either AIRTHINGS_TOKEN or OAuth client credentials (AIRTHINGS_CLIENT_ID/SECRET and AIRTHINGS_TOKEN_URL) must be provided")
 	}
 
 	exp, err := exporter.New(cfg)
