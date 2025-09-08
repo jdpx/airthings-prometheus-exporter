@@ -7,13 +7,14 @@ before:
     - go test ./...
 
 builds:
-  - id: airthings_exporter
+  # Linux/Darwin matrix including armv7
+  - id: airthings_exporter_unix
     main: ./cmd/airthings_exporter/main.go
+    binary: airthings_prometheus_exporter
     env:
       - CGO_ENABLED=0
     goos:
       - linux
-      - windows
       - darwin
     goarch:
       - amd64
@@ -21,6 +22,18 @@ builds:
       - arm
     goarm:
       - "7"
+
+  # Windows matrix without arm (only amd64/arm64)
+  - id: airthings_exporter_windows
+    main: ./cmd/airthings_exporter/main.go
+    binary: airthings_prometheus_exporter
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+    goarch:
+      - amd64
+      - arm64
 
 archives:
   - name_template: "{{ .ProjectName }}_v{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
@@ -30,21 +43,20 @@ archives:
 checksum:
   name_template: "checksums.txt"
 
-# Migrate to dockers_v2 per deprecation notices
-# See: https://goreleaser.com/deprecations#dockers
+# Use legacy dockers pointing to a runtime Dockerfile that copies prebuilt binaries
 
 dockers:
   - image_templates:
       - ghcr.io/jdpx/{{.ProjectName}}:v{{ .Version }}-amd64
     use: buildx
-    dockerfile: Dockerfile
+    dockerfile: Dockerfile.runtime
     build_flag_templates:
       - "--platform=linux/amd64"
 
   - image_templates:
       - ghcr.io/jdpx/{{.ProjectName}}:v{{ .Version }}-arm7
     use: buildx
-    dockerfile: Dockerfile
+    dockerfile: Dockerfile.runtime
     goarch: arm
     goarm: 7
     build_flag_templates:
@@ -53,7 +65,7 @@ dockers:
   - image_templates:
       - ghcr.io/jdpx/{{.ProjectName}}:v{{ .Version }}-arm64
     use: buildx
-    dockerfile: Dockerfile
+    dockerfile: Dockerfile.runtime
     goarch: arm64
     build_flag_templates:
       - "--platform=linux/arm64/v8"
