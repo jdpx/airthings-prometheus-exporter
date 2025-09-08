@@ -1,0 +1,392 @@
+openapi: 3.0.1
+info:
+  contact:
+    email: support@airthings.com
+  description: "The Airthings for Consumer API provides secure and authorized access\
+    \ for Airthings consumers to retrieve the latest data from their Airthings air\
+    \ quality monitors. Leveraging HTTPS and OAuth for enhanced security, this API\
+    \ empowers users to seamlessly access real-time information from their Airthings\
+    \ devices, gaining valuable insights into the air quality within their environments."
+  title: Airthings for Consumer API
+  version: 1.0.0
+externalDocs:
+  description: Find out more about consumerAPI
+  url: https://consumer-api-doc.airthings.com/
+servers:
+- description: Airthings for Consumer API (prod)
+  url: https://consumer-api.airthings.com
+paths:
+  /v1/accounts/{accountId}/sensors:
+    get:
+      description: |
+        Get sensors for a set of devices. The response will contain the latest sensor values for the devices.
+        The sensor values are updated depending on the device types sampling rate.
+        It is recommended to poll the API at a regular interval to get the latest sensor values.
+        The response will be paginated with a maximum of 50 records per page.
+      operationId: getMultipleSensors
+      parameters:
+      - description: The serial numbers of the devices
+        explode: true
+        in: query
+        name: sn
+        required: false
+        schema:
+          items:
+            type: string
+          type: array
+        style: form
+      - description: The account ID associated with the user
+        explode: false
+        in: path
+        name: accountId
+        required: true
+        schema:
+          type: string
+        style: simple
+      - description: The number of a page (of 50 records) to fetch
+        explode: true
+        in: query
+        name: pageNumber
+        required: false
+        schema:
+          default: 1
+          type: integer
+        style: form
+      - description: The units type sensors values will be returned in
+        explode: true
+        in: query
+        name: unit
+        required: false
+        schema:
+          default: metric
+          enum:
+          - metric
+          - imperial
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/getMultipleSensors_200_response"
+          description: OK
+          headers:
+            X-RateLimit-Limit:
+              description: Request limit per hour.
+              explode: false
+              schema:
+                type: integer
+              style: simple
+            X-RateLimit-Remaining:
+              description: The number of requests left for the time window.
+              explode: false
+              schema:
+                type: integer
+              style: simple
+            X-RateLimit-Reset:
+              description: The timestamp at which the current rate limit window resets.
+              explode: false
+              schema:
+                format: timestamp
+                type: string
+              style: simple
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Rate limit exceeded
+          headers:
+            X-RateLimit-Retry-After:
+              description: Number of seconds in which the current rate limit window
+                resets.
+              explode: false
+              schema:
+                format: timestamp
+                type: string
+              style: simple
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Error
+      security:
+      - bearerAuth: []
+      summary: Get sensors for a set of devices
+      tags:
+      - Sensor
+  /v1/accounts/{accountId}/devices:
+    get:
+      description: "List all devices (and their sensor abilities) connected to a user’\
+        s account. The data returned by this endpoint changes when a device is registered,\
+        \ unregistered or renamed."
+      operationId: getDevices
+      parameters:
+      - description: The account ID associated with the user
+        explode: false
+        in: path
+        name: accountId
+        required: true
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevicesResponse"
+          description: OK
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Error
+      security:
+      - bearerAuth: []
+      summary: Get all devices connected to a user
+      tags:
+      - Device
+  /v1/accounts:
+    get:
+      description: Lists all accounts the current user is member of. The data returned
+        by this endpoint changes when a user is added or removed from business accounts.
+        It is safe to assume that the accountId remains constant for Consumer users.
+        The accountId returned by this endpoint is used to fetch the devices and sensors
+        from the other endpoints.
+      operationId: getAccountsIds
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountsResponse"
+          description: OK
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Error
+      summary: List all accounts the current user is member of
+      tags:
+      - Accounts
+  /v1/health:
+    get:
+      operationId: getHealth
+      responses:
+        "200":
+          description: OK
+        default:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Error
+      summary: Get the health of the API
+      tags:
+      - Health
+components:
+  parameters:
+    accountId:
+      description: The account ID associated with the user
+      explode: false
+      in: path
+      name: accountId
+      required: true
+      schema:
+        type: string
+      style: simple
+    deviceSerialNumbers:
+      description: The serial numbers of the devices
+      explode: true
+      in: query
+      name: sn
+      required: false
+      schema:
+        items:
+          type: string
+        type: array
+      style: form
+    pageNumber:
+      description: The number of a page (of 50 records) to fetch
+      explode: true
+      in: query
+      name: pageNumber
+      required: false
+      schema:
+        default: 1
+        type: integer
+      style: form
+    unit:
+      description: The units type sensors values will be returned in
+      explode: true
+      in: query
+      name: unit
+      required: false
+      schema:
+        default: metric
+        enum:
+        - metric
+        - imperial
+        type: string
+      style: form
+  schemas:
+    Error:
+      example:
+        message: message
+      properties:
+        message:
+          description: A message detailing the error encountered
+          type: string
+      type: object
+    SensorsResponse:
+      example:
+        serialNumber: serialNumber
+        sensors:
+        - unit: unit
+          sensorType: sensorType
+          value: 0.8008281904610115
+        - unit: unit
+          sensorType: sensorType
+          value: 0.8008281904610115
+        batteryPercentage: 6
+        recorded: recorded
+      properties:
+        serialNumber:
+          type: string
+        sensors:
+          items:
+            $ref: "#/components/schemas/SensorResponse"
+          type: array
+        recorded:
+          nullable: true
+          type: string
+        batteryPercentage:
+          nullable: true
+          type: integer
+      type: object
+    SensorResponse:
+      example:
+        unit: unit
+        sensorType: sensorType
+        value: 0.8008281904610115
+      nullable: true
+      properties:
+        sensorType:
+          type: string
+        value:
+          format: double
+          type: number
+        unit:
+          type: string
+      type: object
+    AccountsResponse:
+      example:
+        accounts:
+        - id: id
+        - id: id
+      properties:
+        accounts:
+          items:
+            $ref: "#/components/schemas/AccountResponse"
+          type: array
+      type: object
+    AccountResponse:
+      example:
+        id: id
+      properties:
+        id:
+          type: string
+      type: object
+    DevicesResponse:
+      example:
+        devices:
+        - serialNumber: serialNumber
+          sensors:
+          - sensors
+          - sensors
+          name: name
+          type: type
+          home: home
+        - serialNumber: serialNumber
+          sensors:
+          - sensors
+          - sensors
+          name: name
+          type: type
+          home: home
+      properties:
+        devices:
+          items:
+            $ref: "#/components/schemas/DeviceResponse"
+          type: array
+      type: object
+    DeviceResponse:
+      example:
+        serialNumber: serialNumber
+        sensors:
+        - sensors
+        - sensors
+        name: name
+        type: type
+        home: home
+      properties:
+        serialNumber:
+          type: string
+        home:
+          nullable: true
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        sensors:
+          items:
+            type: string
+          type: array
+      type: object
+    getMultipleSensors_200_response:
+      example:
+        totalPages: 1
+        hasNext: true
+        results:
+        - serialNumber: serialNumber
+          sensors:
+          - unit: unit
+            sensorType: sensorType
+            value: 0.8008281904610115
+          - unit: unit
+            sensorType: sensorType
+            value: 0.8008281904610115
+          batteryPercentage: 6
+          recorded: recorded
+        - serialNumber: serialNumber
+          sensors:
+          - unit: unit
+            sensorType: sensorType
+            value: 0.8008281904610115
+          - unit: unit
+            sensorType: sensorType
+            value: 0.8008281904610115
+          batteryPercentage: 6
+          recorded: recorded
+      properties:
+        results:
+          items:
+            $ref: "#/components/schemas/SensorsResponse"
+          type: array
+        hasNext:
+          description: "True if next pages can be fetched, false otherwise."
+          type: boolean
+        totalPages:
+          type: integer
+      type: object
+  securitySchemes:
+    bearerAuth:
+      bearerFormat: JWT
+      scheme: bearer
+      type: http

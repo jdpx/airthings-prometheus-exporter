@@ -1,0 +1,16 @@
+version: "3.9"
+services:
+  airthings-exporter:
+    image: ghcr.io/jdpx/airthings_prometheus_exporter:latest
+    container_name: airthings-exporter
+    restart: unless-stopped
+    environment:
+      - AIRTHINGS_TOKEN=${AIRTHINGS_TOKEN}
+      - ACCOUNT_ID=${ACCOUNT_ID}
+      - UNIT=${UNIT:-metric}
+      - POLL_INTERVAL=${POLL_INTERVAL:-60s}
+      - INCLUDE_SERIALS=${INCLUDE_SERIALS}
+      - LISTEN_ADDR=${LISTEN_ADDR:-:9000}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    ports:
+      - "9000:9000"
