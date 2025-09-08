@@ -26,25 +26,31 @@ You can authenticate either with a ready-to-use Bearer token or via OAuth2 Clien
 - Static token (simplest):
   - `AIRTHINGS_TOKEN`: Provided token is sent as `Authorization: Bearer <token>`.
 - OAuth2 Client Credentials (machine-to-machine), per Airthings auth docs ([Authorization docs](https://consumer-api-doc.airthings.com/docs/api/authorization)):
-  - `AIRTHINGS_CLIENT_ID`
-  - `AIRTHINGS_CLIENT_SECRET`
-  - `AIRTHINGS_TOKEN_URL` (issuer token endpoint)
-  - `AIRTHINGS_SCOPE` (optional)
+  - `AIRTHINGS_CLIENT_ID` (required if no token)
+  - `AIRTHINGS_CLIENT_SECRET` (required if no token)
+  - `AIRTHINGS_TOKEN_URL` (default: `https://accounts-api.airthings.com/v1/token`)
+  - `AIRTHINGS_SCOPE` (default: `read:device:current_values`)
   - `AIRTHINGS_AUDIENCE` (optional, if your provider requires an audience claim)
 
 If `AIRTHINGS_TOKEN` is unset and client credentials are configured, the exporter fetches and refreshes an access token automatically.
 
 ## Configuration (environment variables)
 
-- `AIRTHINGS_TOKEN` (optional if OAuth2 provided): Bearer token for the API
-- `AIRTHINGS_CLIENT_ID` / `AIRTHINGS_CLIENT_SECRET` / `AIRTHINGS_TOKEN_URL` (optional): OAuth2 client credentials
-- `AIRTHINGS_SCOPE` / `AIRTHINGS_AUDIENCE` (optional): Additional OAuth2 parameters
-- `ACCOUNT_ID` (optional): Account ID. If unset, the exporter discovers the single account
-- `UNIT` (optional): `metric` (default) or `imperial`
-- `POLL_INTERVAL` (optional): Poll interval, e.g. `60s` (will dynamically back off when rate-limited)
-- `INCLUDE_SERIALS` (optional): Comma-separated serial numbers to include (default: all devices)
-- `LISTEN_ADDR` (optional): HTTP listen address (default `:9000`)
-- `LOG_LEVEL` (optional): `info` (default) or `debug`
+General:
+- `LISTEN_ADDR` (default `:9000`): HTTP listen address
+- `LOG_LEVEL` (default `info`): `info` or `debug`
+- `LOG_FORMAT` (default `json`): `json` or `text`
+- `UNIT` (default `metric`): `metric` or `imperial`
+- `POLL_INTERVAL` (default `60s`): Background polling cadence
+- `ACCOUNT_ID` (optional): If unset, auto-discovers the single account
+- `INCLUDE_SERIALS` (optional): Comma-separated list of serials to include
+
+Auth:
+- `AIRTHINGS_TOKEN` (optional): Static Bearer token
+- `AIRTHINGS_CLIENT_ID` / `AIRTHINGS_CLIENT_SECRET` (required if `AIRTHINGS_TOKEN` absent)
+- `AIRTHINGS_TOKEN_URL` (default: `https://accounts-api.airthings.com/v1/token`)
+- `AIRTHINGS_SCOPE` (default: `read:device:current_values`)
+- `AIRTHINGS_AUDIENCE` (optional)
 
 ## Exposed metrics
 
@@ -71,6 +77,7 @@ POLL_INTERVAL=60s \
 LISTEN_ADDR=":9000" \
 INCLUDE_SERIALS="" \
 LOG_LEVEL=info \
+LOG_FORMAT=json \
 go run ./cmd/airthings_exporter
 ```
 
@@ -79,11 +86,12 @@ OAuth2 client credentials example:
 ```bash
 AIRTHINGS_CLIENT_ID=... \
 AIRTHINGS_CLIENT_SECRET=... \
-AIRTHINGS_TOKEN_URL=https://<issuer>/oauth/token \
-AIRTHINGS_SCOPE="..." \
-AIRTHINGS_AUDIENCE="..." \
+AIRTHINGS_TOKEN_URL=https://accounts-api.airthings.com/v1/token \
+AIRTHINGS_SCOPE=read:device:current_values \
+AIRTHINGS_AUDIENCE="" \
 UNIT=metric \
 POLL_INTERVAL=60s \
+LOG_FORMAT=json \
 go run ./cmd/airthings_exporter
 ```
 
@@ -103,6 +111,7 @@ Run (Bearer token):
 docker run --rm -p 9000:9000 \
   -e AIRTHINGS_TOKEN=your_token \
   -e UNIT=metric \
+  -e LOG_FORMAT=json \
   ghcr.io/jdpx/airthings_prometheus_exporter:dev
 ```
 
@@ -112,13 +121,15 @@ Run (OAuth2 client credentials):
 docker run --rm -p 9000:9000 \
   -e AIRTHINGS_CLIENT_ID=... \
   -e AIRTHINGS_CLIENT_SECRET=... \
-  -e AIRTHINGS_TOKEN_URL=https://<issuer>/oauth/token \
+  -e AIRTHINGS_TOKEN_URL=https://accounts-api.airthings.com/v1/token \
+  -e AIRTHINGS_SCOPE=read:device:current_values \
+  -e LOG_FORMAT=json \
   ghcr.io/jdpx/airthings_prometheus_exporter:dev
 ```
 
 ### docker-compose
 
-A sample compose file is included:
+A sample compose file is included; see below for all supported env vars.
 
 ```bash
 docker compose up -d

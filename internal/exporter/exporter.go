@@ -18,20 +18,28 @@ import (
 	"golang.org/x/oauth2/clientcredentials"
 )
 
+const defaultAirthingsTokenURL = "https://accounts-api.airthings.com/v1/token"
+
+// Config holds exporter configuration; fields are annotated for envconfig.
 type Config struct {
-	Token         string
-	AccountID     string
-	Unit          string // metric | imperial
-	PollInterval  time.Duration
-	IncludeSerial string // comma-separated
-	ListenAddr    string
+	// General
+	ListenAddr    string        `envconfig:"LISTEN_ADDR" default:":9000"`
+	Unit          string        `envconfig:"UNIT" default:"metric"`
+	PollInterval  time.Duration `envconfig:"POLL_INTERVAL" default:"60s"`
+	IncludeSerial string        `envconfig:"INCLUDE_SERIALS"`
+	AccountID     string        `envconfig:"ACCOUNT_ID"`
+	LogLevel      string        `envconfig:"LOG_LEVEL" default:"info"`
+	LogFormat     string        `envconfig:"LOG_FORMAT" default:"json"`
+
+	// Authentication
+	AirthingsToken string `envconfig:"AIRTHINGS_TOKEN"`
 
 	// OAuth2 client credentials (optional, used if Token is empty)
-	OAuthClientID     string
-	OAuthClientSecret string
-	OAuthTokenURL     string
-	OAuthScope        string
-	OAuthAudience     string
+	OAuthClientID     string `envconfig:"AIRTHINGS_CLIENT_ID,required"`
+	OAuthClientSecret string `envconfig:"AIRTHINGS_CLIENT_SECRET,required"`
+	OAuthTokenURL     string `envconfig:"AIRTHINGS_TOKEN_URL" default:"https://accounts-api.airthings.com/v1/token"`
+	OAuthScope        string `envconfig:"AIRTHINGS_SCOPE" default:"read:device:current_values"`
+	OAuthAudience     string `envconfig:"AIRTHINGS_AUDIENCE"`
 }
 
 type Exporter struct {
@@ -67,14 +75,17 @@ func New(cfg Config) (*Exporter, error) {
 	var httpClient *http.Client
 	var rlCapture = &rateLimitCaptureRoundTripper{underlying: http.DefaultTransport}
 
-	if strings.TrimSpace(cfg.Token) != "" {
+	if strings.TrimSpace(cfg.AirthingsToken) != "" {
 		// Static bearer token mode
 		httpClient = &http.Client{Transport: &bearerRoundTripper{
-			token:      cfg.Token,
+			token:      cfg.AirthingsToken,
 			underlying: rlCapture,
 		}}
-	} else if cfg.OAuthClientID != "" && cfg.OAuthClientSecret != "" && cfg.OAuthTokenURL != "" {
+	} else if cfg.OAuthClientID != "" && cfg.OAuthClientSecret != "" {
 		// OAuth2 client credentials mode
+		if strings.TrimSpace(cfg.OAuthTokenURL) == "" {
+			cfg.OAuthTokenURL = defaultAirthingsTokenURL
+		}
 		cc := &clientcredentials.Config{
 			ClientID:     cfg.OAuthClientID,
 			ClientSecret: cfg.OAuthClientSecret,

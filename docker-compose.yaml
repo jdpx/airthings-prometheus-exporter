@@ -8,8 +8,8 @@ services:
       - AIRTHINGS_TOKEN=${AIRTHINGS_TOKEN}
       - AIRTHINGS_CLIENT_ID=${AIRTHINGS_CLIENT_ID}
       - AIRTHINGS_CLIENT_SECRET=${AIRTHINGS_CLIENT_SECRET}
-      - AIRTHINGS_TOKEN_URL=${AIRTHINGS_TOKEN_URL}
-      - AIRTHINGS_SCOPE=${AIRTHINGS_SCOPE}
+      - AIRTHINGS_TOKEN_URL=${AIRTHINGS_TOKEN_URL:-https://accounts-api.airthings.com/v1/token}
+      - AIRTHINGS_SCOPE=${AIRTHINGS_SCOPE:-read:device:current_values}
       - AIRTHINGS_AUDIENCE=${AIRTHINGS_AUDIENCE}
       - ACCOUNT_ID=${ACCOUNT_ID}
       - UNIT=${UNIT:-metric}
@@ -17,5 +17,6 @@ services:
       - INCLUDE_SERIALS=${INCLUDE_SERIALS}
       - LISTEN_ADDR=${LISTEN_ADDR:-:9000}
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
     ports:
       - "9000:9000"
