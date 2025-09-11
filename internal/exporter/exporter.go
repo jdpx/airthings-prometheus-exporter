@@ -324,7 +324,7 @@ func (e *Exporter) pollOnce(ctx context.Context) {
 			}
 
 			if bp, ok := sr.GetBatteryPercentageOk(); ok && bp != nil {
-				e.batteryGauge.WithLabelValues(sn).Set(float64(*bp))
+				e.batteryGauge.WithLabelValues(dev.Name, sn).Set(float64(*bp))
 			}
 			for _, s := range sr.GetSensors() {
 				unit := s.GetUnit()
