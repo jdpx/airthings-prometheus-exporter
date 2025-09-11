@@ -128,7 +128,7 @@ func New(cfg Config) (*Exporter, error) {
 	e.batteryGauge = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "airthings_battery_percentage",
 		Help: "Airthings battery percentage",
-	}, []string{"serial_number"})
+	}, []string{"device_name", "serial_number"})
 
 	e.lastSuccessTimestamp = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "airthings_last_scrape_success_timestamp_seconds",
