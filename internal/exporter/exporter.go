@@ -35,8 +35,8 @@ type Config struct {
 	AirthingsToken string `envconfig:"AIRTHINGS_TOKEN"`
 
 	// OAuth2 client credentials (optional, used if Token is empty)
-	OAuthClientID     string `envconfig:"AIRTHINGS_CLIENT_ID,required"`
-	OAuthClientSecret string `envconfig:"AIRTHINGS_CLIENT_SECRET,required"`
+	OAuthClientID     string `envconfig:"AIRTHINGS_CLIENT_ID"`
+	OAuthClientSecret string `envconfig:"AIRTHINGS_CLIENT_SECRET"`
 	OAuthTokenURL     string `envconfig:"AIRTHINGS_TOKEN_URL" default:"https://accounts-api.airthings.com/v1/token"`
 	OAuthScope        string `envconfig:"AIRTHINGS_SCOPE" default:"read:device:current_values"`
 	OAuthAudience     string `envconfig:"AIRTHINGS_AUDIENCE"`
