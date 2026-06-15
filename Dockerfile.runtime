@@ -1,0 +1,6 @@
+FROM gcr.io/distroless/static:nonroot
+USER nonroot:nonroot
+# GoReleaser provides the built binary in the build context named like the build's binary (airthings_prometheus_exporter)
+COPY airthings_prometheus_exporter /airthings_exporter
+EXPOSE 9000
+ENTRYPOINT ["/airthings_exporter"]
