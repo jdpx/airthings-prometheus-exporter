@@ -1,9 +1,0 @@
-package: airthings
-generate:
-  models: true
-  client: true
-output: internal/airthings/client.gen.go
-output-options:
-  client:
-    with-responses: true
-  skip-prune: false
